@@ -1,11 +1,28 @@
 #include "esp32-hal-gpio.h"
 #include <Arduino.h>
 #include <ESP32Servo.h>
+#include <WiFi.h>
+#include <PubSubClient.h>
+
 
 int corrected_brightness(int);
 void press_button(int, int);
+void callback(char*, byte*, uint8_t); // Om uint8_t it funkar, prova unsigned int
 
-Servo button_servo; // Create servo object
+// WiFi Settings
+constexpr char* SSID = "YOUR_SSID";
+constexpr char* PSSWD = "YOUR_PASSWORD";
+
+// MQTT Settings
+char *MQTT_SERVER ="broker.yourserver.com";
+int MQTT_PORT = 0000;
+constexpr char* CLIENT_NAME = "DOORPHONE";
+constexpr char* PUB_TOPIC = ""; // The topic the client will publish to
+constexpr char* SUB_TOPIC ="";  // The topic the client will subscribe to
+
+WiFiClient client;                // Create WiFi object
+PubSubClient mqttClient(client);  // Create MQTT Client object
+Servo button_servo;               // Create servo object
 
 constexpr int PHOTO_PIN = 34;     // GPIO pin for photo resistor
 constexpr int SERVO_PIN = 0;      // GPIO pin for servo
@@ -23,6 +40,23 @@ bool already_pressed = false;     // Prevent repeated button presses
 void setup() {
   Serial.begin(115200);
   pinMode(PHOTO_PIN, INPUT);
+  
+  WiFi.mode(WIFI_STA);  // Set WiFi to station mode
+  WiFi.begin(SSID, PSSWD);
+
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("");
+  Serial.print("WiFi connected to: "); Serial.println(SSID);
+  Serial.println("IP address: "); Serial.println(WiFi.localIP());
+
+  delay(2000);
+  mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
+  mqttClient.setCallback(callback);
 
   // Allow allocation of all timers
   ESP32PWM::allocateTimer(0);
@@ -86,4 +120,17 @@ void press_button(int angle, int delay_ms)
   button_servo.write(START_ANGLE - ANGLE);
   delay(DELAY_MS);
   button_servo.write(START_ANGLE);
+}
+
+void callback(char* topic, byte* payload, uint8_t length) {
+  Serial.println("Message received from: ");
+  Serial.println(topic);
+
+  for (uint8_t i = 0; i < length; i++)
+  {
+    Serial.print((char)payload[i]);
+  }
+
+  Serial.println();
+  Serial.println();
 }
